@@ -22,7 +22,6 @@
         }
 
         body {
-            /* 更加繽紛的馬卡龍漸層背景 */
             background: linear-gradient(45deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%);
             min-height: 100vh;
             color: #444;
@@ -79,7 +78,6 @@
         .label { font-size: 0.9rem; color: #888; font-weight: bold; margin-bottom: 5px; }
         .value { font-size: 1.8rem; font-weight: 900; color: #333; }
 
-        /* 時間警告顏色 */
         .timer-low { color: #ff5e62 !important; animation: blink 0.5s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
@@ -106,8 +104,14 @@
             color: white;
             font-weight: bold;
             box-shadow: 0 8px 0px rgba(0,0,0,0.1);
-            transition: 0.2s;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
 
         .note-letter { font-size: 2.2rem; }
@@ -139,7 +143,6 @@
         .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #888; }
         .btn:disabled { background: #ccc; box-shadow: none; cursor: not-allowed; }
 
-        /* 結算畫面 */
         #gameOverModal {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -183,11 +186,17 @@
             font-size: 1.2rem;
             font-weight: bold;
             border-radius: 15px;
+            transition: all 0.3s;
         }
 
-        .correct { color: #4cd137; }
-        .incorrect { color: #e84118; }
+        .correct { color: #4cd137; transform: scale(1.1); }
+        .incorrect { color: #e84118; animation: shake 0.3s; }
 
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
     </style>
 </head>
 <body>
@@ -213,8 +222,7 @@
             </div>
         </div>
 
-        <div class="melody-display" id="melodyArea">
-            </div>
+        <div class="melody-display" id="melodyArea"></div>
 
         <div class="feedback" id="feedback">準備好了嗎？</div>
 
@@ -233,7 +241,7 @@
             <h2 style="font-size: 2.5rem; margin-bottom: 20px;">⏰ 時間到！</h2>
             <p style="font-size: 1.2rem;">你的最終得分</p>
             <div style="font-size: 4rem; font-weight: 900; color: #764ba2;" id="finalScore">0</div>
-            <p id="finalStats"></p>
+            <p id="finalStats" style="margin-bottom: 10px;"></p>
             <button class="restart-btn" onclick="resetGame()">再次挑戰 <i class="fas fa-redo"></i></button>
         </div>
     </div>
@@ -264,6 +272,9 @@
         let timerId = null;
         let currentMelody = null;
         let gameActive = false;
+        
+        // 關鍵：用來記錄上一次題目的索引，防止連續重複
+        let lastMelodyIndex = -1;
 
         function startGame() {
             score = 0;
@@ -271,9 +282,12 @@
             maxStreak = 0;
             timeLeft = 60;
             gameActive = true;
+            lastMelodyIndex = -1; // 重置紀錄
             
             document.getElementById('score').textContent = score;
             document.getElementById('streak').textContent = streak;
+            document.getElementById('feedback').textContent = "開始挑戰！";
+            document.getElementById('feedback').className = "feedback";
             document.getElementById('gameOverModal').style.display = 'none';
             
             nextQuestion();
@@ -295,14 +309,24 @@
         }
 
         function nextQuestion() {
-            currentMelody = melodies[Math.floor(Math.random() * melodies.length)];
+            let randomIndex;
+            
+            // 隨機抽取，直到抽到跟上次不一樣的題目索引
+            do {
+                randomIndex = Math.floor(Math.random() * melodies.length);
+            } while (randomIndex === lastMelodyIndex && melodies.length > 1);
+
+            lastMelodyIndex = randomIndex;
+            currentMelody = melodies[randomIndex];
+
             const area = document.getElementById('melodyArea');
             area.innerHTML = '';
 
-            currentMelody.notes.forEach(note => {
+            currentMelody.notes.forEach((note, index) => {
                 const card = document.createElement('div');
                 card.className = 'note-card';
                 card.style.backgroundColor = colors[note];
+                card.style.animationDelay = (index * 0.05) + 's'; // 增加一點點依序出現的感覺
                 card.innerHTML = `
                     <div class="note-letter">${note}</div>
                     <div class="note-name">${noteNames[note]}</div>
@@ -316,10 +340,11 @@
 
             const feedback = document.getElementById('feedback');
             if (choice === currentMelody.type) {
+                // 分數計算：連勝越多加分越多
                 score += (10 + streak * 2);
                 streak++;
                 if(streak > maxStreak) maxStreak = streak;
-                feedback.textContent = "✨ 太棒了！連勝中：" + streak;
+                feedback.textContent = `✨ 太棒了！連勝中：${streak}`;
                 feedback.className = "feedback correct";
             } else {
                 streak = 0;
@@ -329,7 +354,9 @@
 
             document.getElementById('score').textContent = score;
             document.getElementById('streak').textContent = maxStreak;
-            nextQuestion();
+            
+            // 稍微延遲一下再換題，讓玩家看清楚反饋
+            setTimeout(nextQuestion, 200); 
         }
 
         function endGame() {
@@ -344,7 +371,7 @@
             startGame();
         }
 
-        // 初始化
+        // 當頁面載入後自動開始
         window.onload = startGame;
     </script>
 </body>
